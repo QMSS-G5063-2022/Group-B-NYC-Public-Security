@@ -4,6 +4,6 @@
 
 ### Team Members
   - Huaqing Gu
-  - Jinghan Ma     Email: jm5223@columbia.edu
-  - Lin Wang       Email: linw05031@gmail.com
+  - Jinghan Ma jm5223@columbia.edu
+  - Lin Wang linw05031@gmail.com
   - Hanzhi Zhang
