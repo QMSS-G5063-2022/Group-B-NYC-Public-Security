@@ -2,10 +2,10 @@
 ## **Title: Exploring Connection between Home Ownership and Neighbourhood Safety**
 
 #### Team Members
-  - Huaqing Gu
+  - Huaqing Gu hg2589@columbia.edu
   - Jinghan Ma jm5223@columbia.edu
   - Lin Wang linw05031@gmail.com
-  - Hanzhi Zhang
+  - Hanzhi Zhang hz2744@columbia.edu
 
 **ABSTRACT:** Our group is interested in housing selection and security issues in New York city. For this project, we plan to use NYPD public safety data and New York city zip code data as major data sources, combining variables that represent total occupied housing units and owner-occupied units to create a new variable that measures the percentage of owner-occupied units per NYC zip code. We are looking forward to exploring the following questions:
   - How does the local crime rate impact housing density and occupancy rate? We plan to use graphs to visualise the relationship between housing density and counts of felony crimes in New York City.
