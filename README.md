@@ -28,4 +28,3 @@
   - Line Chart : visualises the number of felonies in NYC change against time for different regions. If more felonies happen when holidays come? Or there have been more crimes in recent years.
   - Bar Chart : visualises the average number of felony for a specific hour to find out when there are more crimes happening.
   - Point Chart: visualises comparisons of the average number of felony between different areas of NYC (by time of the day and by home ownership)
-  - Word Cloud: creates word clouds of the type of felony occurred and key words used in the description of police records for each region of NYC
