@@ -34,6 +34,7 @@ library(ggthemes)
 library(maps)
 library(maptools)
 library(geojsonio)
+library(viridis)
 ```
 
 # Introduction
@@ -94,8 +95,9 @@ nypd_by_hour <- nypd %>%
 nypd_by_hour$day_by_day_in_a_week <- factor(nypd_by_hour$day_by_day_in_a_week, level = c("Sun","Mon","Tue","Wed","Thu","Fri","Sat"))
 nypd_by_hour$Hour <- factor(nypd_by_hour$Hour, level = 0:23, label = c(0:23))
 nypd_by_hour %>%
-  ggplot(aes(x = Hour, y = day_by_day_in_a_week, fill = count)) + geom_tile() +
-  scale_fill_continuous(trans = 'reverse') + ggtitle("Number of Crime reported by Type")
+  ggplot(aes(x = Hour, y = day_by_day_in_a_week, fill = count)) + geom_raster(interpolate = TRUE) + 
+  coord_fixed(expand = FALSE) +
+  scale_fill_viridis() + ggtitle("Number of Crime reported by Type in 2021")
 ```
 
 We used ggplot to create a heat map in order to more clearly view the crime that happened during one week in New York. The shade of blue represents the number of crimes, the darker the color means the higher the crime. It can be easily found that crime normally happens during noon time, then from 15 - 19 pm during the day. Besides, midnight zero clock also has a high incident hour. 
@@ -169,7 +171,15 @@ new<-nypd %>%
   geom_bar(stat="identity") + 
   coord_flip() +
   ggtitle("Number of Crime by Borough and its Crime Type") +
-  xlab("Percent") + ylab("Name of Borough")
+  xlab("Percent") + ylab("Name of Borough") +
+  theme(
+      panel.background = element_rect(fill='transparent'),
+      plot.background = element_rect(fill='transparent', color=NA),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      legend.background = element_rect(fill='transparent'),
+      legend.box.background = element_rect(fill='transparent')
+    )
 new
 ```
 
