@@ -1,0 +1,278 @@
+---
+title: "Group B: NYC Public Security"
+author: "Angela Gu, Jinghan Ma, Lin Wang, Hanzhi Zhang"
+date: '2022-04-27'
+output:
+  html_document:
+    code_folding: "hide"
+    toc: true
+    toc_float:
+      toc_collapsed: false
+    toc_depth: 3
+    theme: journal
+---
+
+
+```{r setup, include=FALSE, warning=FALSE}
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(readr)
+library(plotly)
+library(rvest)
+library(stringr)
+library(DT)
+library(tm)
+library(tidytext)
+library(wordcloud)
+library(reshape2)
+library(lubridate)
+library(leaflet)
+library(RColorBrewer)
+library(ggmap)
+library(ggthemes)
+library(maps)
+library(maptools)
+library(geojsonio)
+library(viridis)
+```
+
+# Introduction
+Our group is interested in **security issues in New York city**. For this project, we plan to use NYPD public safety data and New York city zip code data as major data sources, combining variables that represent all crime complaint cases to analysis the pattern of crime. The data sets including all-valid felony, misdemeanor, and violation crimes reported to the Police. We used mapping and graphs to help us visualize the public security situation in New York. We made 7 graphs to illustrate the safety of New York city.
+
+
+# Part A. Crimes Against Time
+### Total Victims for 24 Hours (Classified with gender)
+```{r, message = FALSE,warning=FALSE}
+#Load the data
+nypd_precinct <- read.csv("NYPD_Complaint_Data_Current__Year_To_Date_.csv")
+nypd<-read.csv("NYPD_Complaint_Data_Current__Year_To_Date - filtered.csv")
+nypd$CMPLNT_FR_DT <- mdy(nypd$CMPLNT_FR_DT)
+nypd$CMPLNT_FR_TM <- format(as.POSIXct(nypd$CMPLNT_FR_TM, format = "%H:%M:%S"),  "%H")
+nypd$CMPLNT_FR_YR <- format(as.POSIXct(nypd$CMPLNT_FR_DT, format = "%Y-%M-%D"),  "%Y")
+nypd$CMPLNT_FR_YRMT<-format(nypd$CMPLNT_FR_DT, "%Y-%m")
+nypd$VIC_SEX[nypd$VIC_SEX == 'F'] <- 'Female'
+nypd$VIC_SEX[nypd$VIC_SEX == 'M'] <- 'Male'
+nypd<-nypd%>%
+  filter(CMPLNT_FR_YR <= 2021)
+plot_data<-nypd %>% 
+  filter(CRM_ATPT_CPTD_CD == 'COMPLETED')%>%
+  filter(VIC_SEX == "Female"|VIC_SEX=="Male")%>%
+  select(CMPLNT_FR_TM,VIC_SEX,CMPLNT_NUM) %>%
+  group_by(CMPLNT_FR_TM,VIC_SEX) %>%
+  count(CMPLNT_NUM)%>%
+  group_by(CMPLNT_FR_TM,VIC_SEX) %>%
+  summarise(Victum_num = sum(n))%>%
+  arrange(VIC_SEX,CMPLNT_FR_TM)
+
+plot_data<-plot_data%>% 
+  rename(Gender = VIC_SEX)
+
+plot1<-plot_data %>%
+  ggplot(.,aes(CMPLNT_FR_TM,Victum_num))+
+  theme_bw()+
+  geom_point(aes(color=Gender))+
+  scale_shape_discrete(guide=FALSE)+
+  labs(x="Hours", y="Total number of victims", title="Total number of victims across 24 hours")+
+  theme(plot.title=element_text(hjust=0.5))
+
+interactiveplot1<-ggplotly(plot1) %>%
+  layout(legend=list(orientation="h", x=0.2, y=-0.2), hovermode="x")
+interactiveplot1
+```
+
+Part A trying to explore the **crime occurrence trend in one day**. We used an **interactive point chart** to demonstrate the **total number of victims over one day (0am - 23pm)** and the different color of the dot represents each gender. The curve showed an upward trend from morning to afternoon time. The total number of victims reached peak during 12pm, especially for female victims. Different from what we commonly think, night time from 23 pm to 4pm the number of crimes diminished quickly and reached bottom at 5am. Overall, the number of female crimes is much higher than male. 
+
+
+### What Time Have the Highest Number of Crimes? (Classified with hour and week days)
+
+```{r, message = FALSE,warning=FALSE}
+nypd$day_by_day_in_a_week<- wday(nypd$CMPLNT_FR_DT, label=TRUE)
+
+return_by_hour <- function(x) {
+  return (as.numeric(strsplit(x,":")[[1]][1]))
+}
+
+nypd_by_hour <- nypd %>%
+  mutate(Hour = sapply(CMPLNT_FR_TM, return_by_hour)) %>%
+  group_by(day_by_day_in_a_week, Hour) %>%
+  summarize(count = n())
+nypd_by_hour$day_by_day_in_a_week <- factor(nypd_by_hour$day_by_day_in_a_week, level = c("Sun","Mon","Tue","Wed","Thu","Fri","Sat"))
+nypd_by_hour$Hour <- factor(nypd_by_hour$Hour, level = 0:23, label = c(0:23))
+nypd_by_hour %>%
+  ggplot(aes(x = Hour, y = day_by_day_in_a_week, fill = count)) + geom_raster(interpolate = TRUE) + 
+  coord_fixed(expand = FALSE) +
+  scale_fill_viridis(trans = 'reverse') + ggtitle("Number of Crime reported by Type in 2021")
+```
+
+This map get in depth on crime happen features and increasing tendency in one week. We used ggplot to create a **heat map** in order to more clearly view the **crime that happened during one week in New York**. The shade of blue represents the number of crimes, the darker the color means the higher the crime. It can be easily found that crime normally happens during noon time, then from 15 - 19 pm during the day. Besides, midnight zero clock also has a high incident hour. 
+
+
+### Total Suspects from 1969 to 2019 (Classified with race)
+
+```{r, message = FALSE,warning=FALSE}
+plot_data2<-nypd %>% 
+  filter(CRM_ATPT_CPTD_CD == 'COMPLETED')%>%
+  filter(SUSP_RACE !="" )%>%
+  filter(CMPLNT_FR_YR != 2021&CMPLNT_FR_YR != 2020 & CMPLNT_FR_YR>=1969)%>%
+  mutate(SUSP_RACE=case_when(SUSP_RACE=="BLACK"~"BLACK",
+        SUSP_RACE=="BLACK HISPANIC"~"BLACK",
+        SUSP_RACE=="WHITE"~"WHITE",
+        SUSP_RACE=="WHITE HISPANIC"~"WHITE",
+        TRUE  ~  "OTHER"))%>%
+  select(CMPLNT_FR_YR,SUSP_RACE,CMPLNT_NUM) %>%
+  group_by(CMPLNT_FR_YR,SUSP_RACE) %>%
+  count(CMPLNT_NUM)%>%
+  group_by(CMPLNT_FR_YR,SUSP_RACE) %>%
+  summarise(SUSP_num = sum(n))%>%
+  arrange(CMPLNT_FR_YR,SUSP_RACE)
+
+fig <- plot_ly(plot_data2, x = ~CMPLNT_FR_YR, y = ~SUSP_num, type = 'scatter', mode = '', color = ~SUSP_RACE) 
+fig <- fig%>%layout(title = 'Total number of suspects each year',
+                    xaxis = list(title = 'Year'),
+                    yaxis = list (title = 'Total number of suspects'))
+
+fig
+```
+
+Then, we used ggplot to explore that which **races has the highest crime suspect possibility**. Other race is the most significant race of suspects followed by white and black population. There used to be a similar level from 2019 to 1996. However, the number of other race crimes jumped sharply from less than 50 to over 300 during 2006 to 2019. 
+
+
+
+# Part B. Crimes of Boroughs
+### Total Crimes of Each Borough in 2021 (Classified with month)
+
+```{r, message = FALSE,warning=FALSE}
+plot_data3<-nypd%>%
+  filter(nypd$CMPLNT_FR_YR == 2021)%>%
+  filter(BORO_NM!="")%>%
+  select(CMPLNT_FR_YRMT,BORO_NM,CMPLNT_NUM) %>%
+  group_by(CMPLNT_FR_YRMT,BORO_NM) %>%
+  count(CMPLNT_NUM)%>%
+  group_by(CMPLNT_FR_YRMT,BORO_NM) %>%
+  summarise(CMPLNT_num = sum(n))%>%
+  arrange(CMPLNT_FR_YRMT,BORO_NM)
+plot_data3$CMPLNT_num_norm <- 0
+plot_data3<-plot_data3%>%
+  mutate(CMPLNT_num_norm=case_when(BORO_NM=="BRONX"~round(CMPLNT_num/42.2, digits = 0),
+        BORO_NM=="BROOKLYN"~round(CMPLNT_num/69.4, digits = 0),
+        BORO_NM=="MANHATTAN"~round(CMPLNT_num/22.7, digits = 0),
+        BORO_NM=="QUEENS"~round(CMPLNT_num/108.7, digits = 0),
+        BORO_NM=="STATEN ISLAND"~round(CMPLNT_num/57.5, digits = 0)))
+
+plot3<-plot_ly(plot_data3,x = ~CMPLNT_num_norm, y = ~reorder(BORO_NM, (CMPLNT_num_norm)), type = 'bar', 
+                name = ~CMPLNT_FR_YRMT, color = ~CMPLNT_FR_YRMT) %>%
+      layout(yaxis = list(title = 'Count'), barmode = 'stack')
+plot3 <- plot3%>%layout(title = 'Total number of crimes of each borough in 2021 (Normalized by Land Area)',
+                    xaxis = list(title = 'Name of Borough'),
+                    yaxis = list (title = 'Number of crimes/Square miles'))
+plot3
+```
+
+Furthermore, we added more factors in ggplot and selected 2021 as target year to explore the **total crime data in New York**. The number of crimes have been **normalized** by each borough's land area, so the number presented in the graph is number of crime divided by its area. Manhattan has the highest crime rate which is much higher than other boroughs. Bronx and Brooklyn rank second and third place. More specifically, from October to December, the crime cases increase quicker than other months in 2021. 
+
+
+### Total Crimes of Each Borough (Classified with crime category)
+
+```{r, message = FALSE,warning=FALSE}
+new<-nypd %>%
+  filter(BORO_NM !="" )%>%
+  group_by(BORO_NM, LAW_CAT_CD) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(x=count, y=reorder(BORO_NM, -(count)), fill=LAW_CAT_CD)) + 
+  geom_bar(stat="identity") + 
+  coord_flip() +
+  ggtitle("Number of Crime by Borough and its Crime Type") +
+  xlab("Percent") + ylab("Name of Borough") +
+  theme(
+      panel.background = element_rect(fill='transparent'),
+      plot.background = element_rect(fill='transparent', color=NA),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      legend.background = element_rect(fill='transparent'),
+      legend.box.background = element_rect(fill='transparent')
+    )
+new
+```
+
+This **stacked bar chart** demonstrates the **total number of crimes by borough with its crime type**. Brooklyn still has the largest crime case number. Most crime types are misdemeanors, which are represented by green color.
+
+
+
+# Part C. Geographical Analysis
+### Crimes in Each District
+
+```{r, message = FALSE,warning=FALSE}
+data<-nypd_precinct%>% filter(CRM_ATPT_CPTD_CD !="" )
+data <- data %>% group_by(ADDR_PCT_CD)%>%
+  count(CRM_ATPT_CPTD_CD)
+
+data1 <-data[which(data$CRM_ATPT_CPTD_CD == "ATTEMPTED"),]
+data_attempted <-select(data1, c('ADDR_PCT_CD','n'))
+names(data_attempted)[1] <- 'police_precinct'
+names(data_attempted)[2] <-'attempted'
+data2 <-data[which(data$CRM_ATPT_CPTD_CD == "COMPLETED"),]
+data_completed <-select(data2, c('ADDR_PCT_CD','n'))
+names(data_completed)[1] <- 'police_precinct'
+names(data_completed)[2] <-'completed'
+
+data_total <- merge(x=data_attempted, y=data_completed, by= "police_precinct")
+data_total$total_crime <- data_total$attempted + data_total$completed
+
+
+datajson <- geojsonio::geojson_read("https://data.beta.nyc/dataset/5ed20732-5cf9-4812-b8ac-70ad4d10a1ca/resource/375dcf37-5cd9-4c74-9c53-c638b6bb62d0/download/742720184001424d85664732f950040apoliceprecincts.geojson", what = "sp")
+```
+
+```{r, message = FALSE,warning=FALSE}
+bins <- c(0, 2000, 4000, 6000, 8000, 10000, 12000, Inf)
+pal <- colorBin("YlOrRd", domain = data_total$total_crime, bins = bins)
+
+leaflet(datajson) %>%
+  addProviderTiles("MapBox", options = providerTileOptions(
+  id = "mapbox.light",
+  accessToken = Sys.getenv('MAPBOX_ACCESS_TOKEN')))%>%
+  addProviderTiles("Stamen.TonerLite") %>%
+  addPolygons(
+  fillColor = ~pal(data_total$total_crime),
+  weight = 2,
+  opacity = 1,
+  color = "white",
+  dashArray = "3",
+  fillOpacity = 0.7,
+  highlightOptions = highlightOptions(
+    weight = 5,
+    color = "#666",
+    dashArray = "",
+    fillOpacity = 0.7,
+    bringToFront = TRUE),
+    label=paste('Number of Total Crime:', data_total$total_crime,
+                 '; Number of Completed Crime:',data_total$completed,
+                 '; Number of Attempted Crime:',data_total$attempted,
+                 '; Police Precinct:',data_total$police_precinct))%>%
+  addLegend("bottomright", pal = pal, values = data_total$total_crime,
+    title = "Number of Total Crime",
+    opacity = 1
+  )
+```
+
+We used a **leaflet to draw a geo-graph** which contains demographic variables in the **police precinct data that may relate to the crime rate in New York City**. The graph illustrates that the crime rates are really different in various districts. The darker the color, the higher crime rates. The areas with high proportions are distributed by Brooklyn and Manhattan, especially in the east side of Brooklyn and west upper side of Manhattan. 
+
+### The Distribution of Different Crime Types
+
+```{r, message = FALSE,warning=FALSE}
+nypd <- nypd %>% slice_sample(n = 100)
+pal = colorFactor(palette = c("#E41A1C", "#4DAF4A","#377EB8"), domain = nypd$LAW_CAT_CD)
+color = pal(nypd$LAW_CAT_CD)
+popup_info <- paste("Status of Crime:",nypd$CRM_ATPT_CPTD_CD,
+                 "Specific location of occurrence:",nypd$LOC_OF_OCCUR_DESC,
+                 "Patrol Borough:",nypd$PATROL_BORO)
+leaflet(nypd) %>%
+      addProviderTiles("Stamen.TonerLite") %>% #
+      addCircles(col=color,popup = popup_info)%>%
+      addLegend(pal = pal,values = nypd$LAW_CAT_CD, title = "Level of Offense")
+```
+
+Lastly, we also used graphs to demonstrate the **level of offense distributed in New York**. Red means Felony. Misdemeanor is a green spot. Violation is the blue dot. The blue color, which is a misdemeanor, scatters all over the New York City area. It has the highest happen rate which is concentrated in the Brooklyn and Manhattan area. Then there is the felony which is much lower than the first crime type. The violation just maintains a small portion of the whole area.  
+
+# Conclusion
+In Summary, the data visualization helps us better understand the **crime destruction and pattern in New York City**. Contrary to what we used to believe crime happens during the time, noon has the highest occurrence possibility. Besides Brooklyn has a high crime report rate, we should pay attention to the safety issue in this area.  
